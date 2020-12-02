@@ -2,7 +2,6 @@ package demo03_test
 
 import (
 	"encoding/json"
-	"fmt"
 	JTStools "github.com/sajanray/GoJsonToStruct"
 	"testing"
 )
@@ -147,8 +146,6 @@ func TestDemo2(t *testing.T) {
 }
 
 func TestDemo3(t *testing.T) {
-	test()
-	return
 	stu2 := Student{}
 	str := `
 {
@@ -226,92 +223,4 @@ func TestDemo3(t *testing.T) {
 	m.Transform(&stu2 , tmp)
 
 	t.Log("json转struct成功，stu2 =",stu2)
-}
-
-
-func test() {
-	stu2 := Student{}
-	str := `
-{
-  "name": "admin",
-  "age": 20,
-  "mobile": "13813141567",
-  "height": 178,
-  "address": "北京",
-  "school": {
-    "name": "某某大学",
-    "founded": "1970-10-01",
-    "age": 70,
-    "subject": [
-      {
-        "Name": "语文",
-        "Score": 90,
-        "Pass": true
-      },
-      {
-        "Name": "美术",
-        "Score": 50,
-        "Pass": false
-      },
-      {
-        "Name": "数学",
-        "Score": 90,
-        "Pass": true
-      }
-    ],
-    "subject2": [
-      {
-        "Name": "语文",
-        "Score": 90,
-        "Pass": true
-      },
-      {
-        "Name": "美术",
-        "Score": 50,
-        "Pass": false
-      },
-      {
-        "Name": "数学",
-        "Score": 90,
-        "Pass": true
-      }
-    ],
-    "subject3": {
-      "1":{
-        "Name": "语文",
-        "Score": 90,
-        "Pass": true
-      },
-      "2":{
-        "Name": "美术",
-        "Score": 50,
-        "Pass": false
-      },
-      "3":{
-        "Name": "数学",
-        "Score": 90,
-        "Pass": true
-      }
-    }
-  }
-}
-`
-
-	//先把json串Unmarshal
-	var tmp interface{}
-	err := json.Unmarshal([]byte(str), &tmp)
-	if err != nil {
-		fmt.Println("json.Unmarshal error:",err.Error())
-		return
-	}
-
-	//开始转换
-	m := JTStools.NewMapToStruct()
-	m.Transform(&stu2 , tmp)
-	if m.Success {
-		fmt.Println("转换成功")
-		fmt.Println(stu2)
-	} else {
-		fmt.Println("转换失败")
-	}
 }
