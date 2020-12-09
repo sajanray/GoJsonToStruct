@@ -96,7 +96,7 @@ func (m *MapToStruct) Transform(destStructData interface{} , sourceMap interface
 			if m.Debug {
 				log.Printf("结构体第%d个字段，获取对应map的值失败",i)
 			}
-			return
+			continue
 		}
 
 		//map对应值的类型
