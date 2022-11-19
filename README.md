@@ -134,3 +134,4 @@ func test() {
 //{admin 20 13813141567 178 北京 {某某大学 1970-10-01 70 [{语文 90 true} {美术 50 false} {数学 90 true}] [0xc0000046c0 0xc000004700 0xc000004740] map[1:{语文 90 true} 2:{美术 50 false} 3:{数学 90 true}]}}
 ```
 done
+complete
