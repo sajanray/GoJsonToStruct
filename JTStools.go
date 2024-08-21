@@ -1,9 +1,10 @@
 /*
- @project:JsonToStruct
- @author:sajanray@163.com
- @date:2020/6/30
- @note:
+	@project:JsonToStruct
+	@author:leishaojin2012@163.com
+	@date:2024/8/21
+	@note:json转struct库
 */
+
 package JTStools
 
 import (
@@ -14,67 +15,77 @@ import (
 	"strings"
 )
 
+// map转struct
 type MapToStruct struct {
-	Debug bool        //调试模式
-	Success bool      //是否转换成功
-	Tagkey string     //结构体标签名
+	Debug   bool   //调试模式
+	Success bool   //是否转换成功
+	Tagkey  string //结构体标签名
 
 	structTypeOf  reflect.Type
 	structTofElem reflect.Type
 	structValueOf reflect.Value
 	structVofElem reflect.Value
 
-	sourceMapData interface{}
+	sourceMapData interface{} //map源数据
 }
 
-func NewMapToStruct() *MapToStruct{
+// 工厂方法返回指针
+func NewMapToStruct() *MapToStruct {
 	m := &MapToStruct{}
 	m.Tagkey = "json"
 	m.Debug = false
 	return m
 }
 
-func (m *MapToStruct) cloneMapToStruct() *MapToStruct{
+// clone本结构体对象
+func (m *MapToStruct) cloneMapToStruct() *MapToStruct {
 	n := &MapToStruct{}
 	n.Tagkey = m.Tagkey
 	n.Debug = m.Debug
 	return n
 }
 
-func (m *MapToStruct) getMapValue(i int) (mapVal interface{},ok bool){
+// 获取map的值
+func (m *MapToStruct) getMapValue(i int) (mapVal interface{}, ok bool) {
 	//取tag名
 	tagName := m.structTofElem.Field(i).Tag.Get(m.Tagkey)
 	if tagName != "" {
-		mapVal, ok = m.sourceMapData.(map[string]interface{})[tagName]  //取map对应结构体tagName的值
+		mapVal, ok = m.sourceMapData.(map[string]interface{})[tagName] //取map对应结构体tagName的值
 	} else {
 		//todo 结构体字段tag名称这里没有对字段名做任何转换和结构体字段名保持一致（可以对字段名进行多次转换后在尝试取map中的值）
 		tagName = m.structTofElem.Field(i).Name
 		mapVal, ok = m.sourceMapData.(map[string]interface{})[tagName]
 	}
-	return mapVal,ok
+	return mapVal, ok
 }
 
-//MapToStruct  把map映射到结构体
-func (m *MapToStruct) Transform(destStructData interface{} , sourceMap interface{}) {
+// 把map映射到结构体
+func (m *MapToStruct) Transform(destStructData interface{}, sourceMap interface{}) {
+	if destStructData == nil {
+		if m.Debug {
+			log.Println("param destStructData is nil")
+		}
+		return
+	}
 	if sourceMap == nil {
 		if m.Debug {
-			log.Println("sourceMap is nil")
+			log.Println("param sourceMap is nil")
 		}
 		return
 	}
 	m.sourceMapData = sourceMap
 
+	//debug 调试信息
 	if m.Debug {
-		log.Println("递归调用，","目标:",destStructData ,"数据源:", m.sourceMapData)
+		log.Println("递归调用，", "目标:", destStructData, "数据源:", m.sourceMapData)
 	}
 
-	/*
-	for i,v := range mapData.(map[string]interface{}) {
-		fmt.Printf("key=%s,val=%v,type=%T\n",i,v,v)
-	}
-	*/
+	//调试时打印map的值
+	//for i,v := range mapData.(map[string]interface{}) {
+	//	fmt.Printf("key=%s,val=%v,type=%T\n",i,v,v)
+	//}
 
-	m.structTypeOf  = reflect.TypeOf(destStructData)
+	m.structTypeOf = reflect.TypeOf(destStructData)
 	m.structTofElem = m.structTypeOf.Elem()
 	m.structValueOf = reflect.ValueOf(destStructData)
 	m.structVofElem = m.structValueOf.Elem()
@@ -87,31 +98,32 @@ func (m *MapToStruct) Transform(destStructData interface{} , sourceMap interface
 			continue
 		}
 
-		//结构体字段类型
-		structFieldType := m.structTofElem.Field(i).Type.Kind()
-
 		//获取map对应的value
-		mapVal,ok := m.getMapValue(i)
+		mapVal, ok := m.getMapValue(i)
 		if !ok {
 			if m.Debug {
-				log.Printf("结构体第%d个字段，获取对应map的值失败",i)
+				log.Printf("结构体第%d个字段(%s)，获取对应map的值失败", i, m.structTofElem.Field(i).Name)
 			}
 			continue
 		}
 
+		//结构体字段类型
+		structFieldType := m.structTofElem.Field(i).Type.Kind()
+
 		//map对应值的类型
 		mapValueType := reflect.TypeOf(mapVal).Kind()
 		if m.Debug {
-			log.Println("map(",mapValueType,") -> ","struct(",structFieldType,")")
+			log.Println("map(", mapValueType, ") -> ", "struct(", structFieldType, ")")
 		}
 		//类型相同的直接set
 		if structFieldType == mapValueType {
 			switch structFieldType {
-			case reflect.Slice://如果都是切片
-				m.setSlice(i,mapVal)
-			case reflect.Map://如果都是map
-				m.setMap(i,mapVal)
-			default://其他基本类型直接set
+			case reflect.Slice: //如果都是切片
+				m.setSlice(i, mapVal)
+			case reflect.Map: //如果都是map
+				m.setMap(i, mapVal)
+			default:
+				//其他基本类型直接set
 				m.structVofElem.Field(i).Set(reflect.ValueOf(mapVal))
 			}
 		} else {
@@ -119,31 +131,31 @@ func (m *MapToStruct) Transform(destStructData interface{} , sourceMap interface
 			switch structFieldType {
 			//结构体值类型为int 一类
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				m.transformInt(i,mapVal,mapValueType)
+				m.transformInt(i, mapVal, mapValueType)
 			//结构体值类型为uint 一类
 			case reflect.Uint, reflect.Uintptr, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				m.transformUint(i,mapVal,mapValueType)
+				m.transformUint(i, mapVal, mapValueType)
 			//结构体值类型为 float 一类
 			case reflect.Float32, reflect.Float64:
-				m.transformFloat(i,mapVal,mapValueType)
+				m.transformFloat(i, mapVal, mapValueType)
 			//结构体值类型为 bool
 			case reflect.Bool:
-				m.transformBool(i,mapVal,mapValueType)
+				m.transformBool(i, mapVal, mapValueType)
 			//结构体值类型为 string
 			case reflect.String:
-				m.transformString(i,mapVal,mapValueType)
+				m.transformString(i, mapVal, mapValueType)
 			//结构体值类型为 struct
 			case reflect.Struct:
-				m.transformStruct(i,mapVal,mapValueType)
+				m.transformStruct(i, mapVal, mapValueType)
 			//结构体值类型为 struct
 			case reflect.Slice:
-				m.transformSlice(i,mapVal,mapValueType)
+				m.transformSlice(i, mapVal, mapValueType)
 			//结构体值类型为 Map
 			case reflect.Map:
-				m.transformMap(i,mapVal,mapValueType)
+				m.transformMap(i, mapVal, mapValueType)
 			//引用类型
 			case reflect.Ptr:
-				m.transformPtr(i,mapVal,mapValueType)
+				m.transformPtr(i, mapVal, mapValueType)
 			default:
 			}
 		}
@@ -151,7 +163,7 @@ func (m *MapToStruct) Transform(destStructData interface{} , sourceMap interface
 	m.Success = true
 }
 
-func (m *MapToStruct) transformInt(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformInt(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
 		m.structVofElem.Field(i).SetInt(int64(mapVal.(float64)))
@@ -166,7 +178,7 @@ func (m *MapToStruct) transformInt(i int , mapVal interface{} , mapValueType ref
 	}
 }
 
-func (m *MapToStruct) transformUint(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformUint(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
 		m.structVofElem.Field(i).SetUint(uint64(mapVal.(float64)))
@@ -181,7 +193,7 @@ func (m *MapToStruct) transformUint(i int , mapVal interface{} , mapValueType re
 	}
 }
 
-func (m *MapToStruct) transformFloat(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformFloat(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
 		m.structVofElem.Field(i).SetFloat(mapVal.(float64))
@@ -196,7 +208,7 @@ func (m *MapToStruct) transformFloat(i int , mapVal interface{} , mapValueType r
 	}
 }
 
-func (m *MapToStruct) transformBool(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformBool(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.String:
 		mapValStr := strings.ToLower(mapVal.(string))
@@ -216,7 +228,7 @@ func (m *MapToStruct) transformBool(i int , mapVal interface{} , mapValueType re
 	}
 }
 
-func (m *MapToStruct) transformString(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformString(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
 		//mapValStr := strconv.FormatFloat(mapVal.(float64),'g',10,64)
@@ -226,22 +238,22 @@ func (m *MapToStruct) transformString(i int , mapVal interface{} , mapValueType 
 	}
 }
 
-func (m *MapToStruct) transformStruct(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformStruct(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	if mapValueType == reflect.Map {
 		m.cloneMapToStruct().Transform(m.structVofElem.Field(i).Addr().Interface(), mapVal)
 	}
 }
 
-func (m *MapToStruct) transformSlice(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformSlice(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	if mapValueType == reflect.Map {
 		//创建结构体map里面元素的结构体对象
 		valTmp := reflect.Indirect(m.structVofElem.Field(i))
 		structVal := reflect.New(valTmp.Type().Elem())
 
 		//循环目标map处理
-		for _,v := range mapVal.(map[string]interface{}) {
+		for _, v := range mapVal.(map[string]interface{}) {
 			//递归处理
-			m.cloneMapToStruct().Transform(structVal.Interface() , v)
+			m.cloneMapToStruct().Transform(structVal.Interface(), v)
 
 			//把节点append进上层结构体
 			m.structVofElem.Field(i).Set(reflect.Append(m.structVofElem.Field(i), structVal.Elem()))
@@ -249,7 +261,7 @@ func (m *MapToStruct) transformSlice(i int , mapVal interface{} , mapValueType r
 	}
 }
 
-func (m *MapToStruct) transformMap(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformMap(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	//需要把map 对应的slice放进strut的map结构中
 	if mapValueType == reflect.Slice {
 		//对应切片结构体的值
@@ -259,7 +271,7 @@ func (m *MapToStruct) transformMap(i int , mapVal interface{} , mapValueType ref
 		//需要make上层map
 		m.structVofElem.Field(i).Set(reflect.MakeMap(m.structVofElem.Field(i).Type()))
 
-		for k , v := range mapValSli {
+		for k, v := range mapValSli {
 			//new一个切片结构体里面的元素
 			structVal := reflect.New(valTmp.Type().Elem())
 
@@ -268,12 +280,12 @@ func (m *MapToStruct) transformMap(i int , mapVal interface{} , mapValueType ref
 
 			//把map塞进目标map
 			key := strconv.Itoa(k)
-			m.structVofElem.Field(i).SetMapIndex(reflect.ValueOf(key) , structVal.Elem())
+			m.structVofElem.Field(i).SetMapIndex(reflect.ValueOf(key), structVal.Elem())
 		}
 	}
 }
 
-func (m *MapToStruct) transformPtr(i int , mapVal interface{} , mapValueType reflect.Kind) {
+func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType reflect.Kind) {
 	//真实的类型
 	structFieldTypeReal := m.structTofElem.Field(i).Type.Elem().Kind()
 	//log.Println("真实类型：",structFieldTypeReal)
@@ -531,7 +543,7 @@ func (m *MapToStruct) transformPtr(i int , mapVal interface{} , mapValueType ref
 	}
 }
 
-func (m *MapToStruct) setMap(i int , mapVal interface{}) {
+func (m *MapToStruct) setMap(i int, mapVal interface{}) {
 	//创建结构体map里面元素的结构体对象
 	valTmp := reflect.Indirect(m.structVofElem.Field(i))
 	valTmpTpy := valTmp.Type().Elem().Kind()
@@ -554,7 +566,7 @@ func (m *MapToStruct) setMap(i int , mapVal interface{}) {
 	var mapkey reflect.Value
 	for mk, mv := range mapVal.(map[string]interface{}) {
 		//递归处理
-		m.cloneMapToStruct().Transform(structVal.Interface() , mv)
+		m.cloneMapToStruct().Transform(structVal.Interface(), mv)
 
 		//对结构体map key转换处理
 		var i64 int64
@@ -568,7 +580,7 @@ func (m *MapToStruct) setMap(i int , mapVal interface{}) {
 			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			{
-				i64,err= strconv.ParseInt(mk, 10, 64)
+				i64, err = strconv.ParseInt(mk, 10, 64)
 				if err == nil {
 					switch structVofElemKeyType.Kind() {
 					case reflect.Int:
@@ -581,12 +593,16 @@ func (m *MapToStruct) setMap(i int , mapVal interface{}) {
 						mapkey = reflect.ValueOf(int32(i64))
 					case reflect.Int64:
 						mapkey = reflect.ValueOf(i64)
+					default:
+						if m.Debug {
+							log.Println("未识别的数据类型:", structVofElemKeyType.Kind())
+						}
 					}
 				}
 			}
 		case reflect.Uint, reflect.Uintptr, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			{
-				ui64,err = strconv.ParseUint(mk,10,64)
+				ui64, err = strconv.ParseUint(mk, 10, 64)
 				if err == nil {
 					switch structVofElemKeyType.Kind() {
 					case reflect.Uint:
@@ -601,51 +617,63 @@ func (m *MapToStruct) setMap(i int , mapVal interface{}) {
 						mapkey = reflect.ValueOf(uint32(ui64))
 					case reflect.Uint64:
 						mapkey = reflect.ValueOf(ui64)
+					default:
+						if m.Debug {
+							log.Println("未识别的数据类型:", structVofElemKeyType.Kind())
+						}
 					}
 				}
 			}
 		case reflect.Float32, reflect.Float64:
 			{
-				f64,err = strconv.ParseFloat(mk,64)
+				f64, err = strconv.ParseFloat(mk, 64)
 				if err == nil {
 					switch structVofElemKeyType.Kind() {
 					case reflect.Float32:
 						mapkey = reflect.ValueOf(float32(f64))
 					case reflect.Float64:
 						mapkey = reflect.ValueOf(f64)
+					default:
+						if m.Debug {
+							log.Println("未识别的数据类型:", structVofElemKeyType.Kind())
+						}
 					}
 				}
+			}
+		default:
+			if m.Debug {
+				log.Println("未识别的数据类型:", reflect.String)
 			}
 		}
 		//如果key有效则set值
 		if mapkey.IsValid() {
 			//把map塞进目标map
 			if valTmpTpy == reflect.Ptr {
-				m.structVofElem.Field(i).SetMapIndex(mapkey , structVal)
+				m.structVofElem.Field(i).SetMapIndex(mapkey, structVal)
 
 				//todo 二级指针处理
 				//structVofElem.Field(i).SetMapIndex(mapkey , reflect.New(structVal.Type()))
 			} else {
-				m.structVofElem.Field(i).SetMapIndex(mapkey , structVal.Elem())
+				m.structVofElem.Field(i).SetMapIndex(mapkey, structVal.Elem())
 			}
 		}
 
 		//转换失败
-		if err != nil{
+		if err != nil {
 			if m.Debug {
-				log.Println("map key(string) transform fail:" , err.Error())
+				log.Println("map key(string) transform fail:", err.Error())
 			}
 		}
 	}
 }
 
-func (m *MapToStruct) setSlice(i int , mapVal interface{}) {
+func (m *MapToStruct) setSlice(i int, mapVal interface{}) {
 	//实现方式一 [开始]
 	//对应切片结构体的值
 	valTmp := reflect.Indirect(m.structVofElem.Field(i))
 	valTmpTpy := valTmp.Type().Elem().Kind()
 
-	//切面map的list集合
+	//切片map的list集合
 	mapValSli := mapVal.([]interface{})
 	var structVal reflect.Value
 	for _, v := range mapValSli {
