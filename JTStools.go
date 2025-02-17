@@ -8,6 +8,7 @@
 package JTStools
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
@@ -15,11 +16,12 @@ import (
 	"strings"
 )
 
-// map转struct
+// MapToStruct map转struct
 type MapToStruct struct {
 	Debug   bool   //调试模式
 	Success bool   //是否转换成功
 	Tagkey  string //结构体标签名
+	errmsg  string //错误信息
 
 	structTypeOf  reflect.Type
 	structTofElem reflect.Type
@@ -29,7 +31,12 @@ type MapToStruct struct {
 	sourceMapData interface{} //map源数据
 }
 
-// 工厂方法返回指针
+// getErrmsg 获取错误
+func (m *MapToStruct) getErrmsg() string {
+	return m.errmsg
+}
+
+// NewMapToStruct 工厂方法返回指针
 func NewMapToStruct() *MapToStruct {
 	m := &MapToStruct{}
 	m.Tagkey = "json"
@@ -59,21 +66,46 @@ func (m *MapToStruct) getMapValue(i int) (mapVal interface{}, ok bool) {
 	return mapVal, ok
 }
 
-// 把map映射到结构体
-func (m *MapToStruct) Transform(destStructData interface{}, sourceMap interface{}) {
+// Transform 把map映射到结构体
+func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface{}) {
 	if destStructData == nil {
+		m.errmsg = "param destStructData is nil"
 		if m.Debug {
-			log.Println("param destStructData is nil")
+			log.Println(m.errmsg)
 		}
 		return
 	}
-	if sourceMap == nil {
+	if sourceData == nil {
+		m.errmsg = "param sourceData is nil"
 		if m.Debug {
-			log.Println("param sourceMap is nil")
+			log.Println(m.errmsg)
 		}
 		return
 	}
-	m.sourceMapData = sourceMap
+
+	//类型断言
+	str, ok := sourceData.(string)
+	if ok {
+		//if reflect.TypeOf(sourceMap).Kind() == reflect.String
+		//json解码
+		err := json.Unmarshal([]byte(str), &m.sourceMapData)
+		if err != nil {
+			m.errmsg = err.Error()
+			if m.Debug {
+				log.Println(m.errmsg)
+			}
+			return
+		}
+	} else {
+		m.sourceMapData, ok = sourceData.(map[string]interface{})
+		if !ok {
+			m.errmsg = "sourceData type is not map[string]interface{}"
+			if m.Debug {
+				log.Println(m.errmsg)
+			}
+			return
+		}
+	}
 
 	//debug 调试信息
 	if m.Debug {

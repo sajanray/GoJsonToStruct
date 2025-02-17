@@ -2,6 +2,7 @@ package test1
 
 import (
 	"encoding/json"
+	JTStools "github.com/sajanray/GoJsonToStruct"
 	"testing"
 )
 
