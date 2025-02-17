@@ -32,7 +32,7 @@ type MapToStruct struct {
 }
 
 // getErrmsg 获取错误
-func (m *MapToStruct) getErrmsg() string {
+func (m *MapToStruct) GetErrmsg() string {
 	return m.errmsg
 }
 
