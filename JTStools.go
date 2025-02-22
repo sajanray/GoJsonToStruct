@@ -53,9 +53,9 @@ func (m *MapToStruct) cloneMapToStruct() *MapToStruct {
 }
 
 // 获取map的值
-func (m *MapToStruct) getMapValue(i int) (mapVal interface{}, ok bool) {
+func (m *MapToStruct) getMapValue(i int) (mapVal interface{}, ok bool, tagName string) {
 	//取tag名
-	tagName := m.structTofElem.Field(i).Tag.Get(m.Tagkey)
+	tagName = m.structTofElem.Field(i).Tag.Get(m.Tagkey)
 	if tagName != "" {
 		mapVal, ok = m.sourceMapData.(map[string]interface{})[tagName] //取map对应结构体tagName的值
 	} else {
@@ -63,7 +63,7 @@ func (m *MapToStruct) getMapValue(i int) (mapVal interface{}, ok bool) {
 		tagName = m.structTofElem.Field(i).Name
 		mapVal, ok = m.sourceMapData.(map[string]interface{})[tagName]
 	}
-	return mapVal, ok
+	return mapVal, ok, tagName
 }
 
 // Transform 把map映射到结构体
@@ -131,7 +131,7 @@ func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface
 		}
 
 		//获取map对应的value
-		mapVal, ok := m.getMapValue(i)
+		mapVal, ok, tagName := m.getMapValue(i)
 		if !ok {
 			if m.Debug {
 				log.Printf("结构体第%d个字段(%s)，获取对应map的值失败", i, m.structTofElem.Field(i).Name)
@@ -163,19 +163,19 @@ func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface
 			switch structFieldType {
 			//结构体值类型为int 一类
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				m.transformInt(i, mapVal, mapValueType)
+				m.transformInt(i, &mapVal, &tagName, mapValueType)
 			//结构体值类型为uint 一类
 			case reflect.Uint, reflect.Uintptr, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				m.transformUint(i, mapVal, mapValueType)
+				m.transformUint(i, &mapVal, &tagName, mapValueType)
 			//结构体值类型为 float 一类
 			case reflect.Float32, reflect.Float64:
-				m.transformFloat(i, mapVal, mapValueType)
+				m.transformFloat(i, &mapVal, &tagName, mapValueType)
 			//结构体值类型为 bool
 			case reflect.Bool:
-				m.transformBool(i, mapVal, mapValueType)
+				m.transformBool(i, &mapVal, mapValueType)
 			//结构体值类型为 string
 			case reflect.String:
-				m.transformString(i, mapVal, mapValueType)
+				m.transformString(i, &mapVal, mapValueType)
 			//结构体值类型为 struct
 			case reflect.Struct:
 				m.transformStruct(i, mapVal, mapValueType)
@@ -195,62 +195,77 @@ func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface
 	m.Success = true
 }
 
-func (m *MapToStruct) transformInt(i int, mapVal interface{}, mapValueType reflect.Kind) {
+func (m *MapToStruct) transformInt(i int, mapVal *interface{}, mapKey *string, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
-		m.structVofElem.Field(i).SetInt(int64(mapVal.(float64)))
+		m.structVofElem.Field(i).SetInt(int64((*mapVal).(float64)))
 	case reflect.String:
-		i64, err := strconv.ParseInt(mapVal.(string), 10, 64)
-		if err == nil {
-			m.structVofElem.Field(i).SetInt(i64)
+		str := strings.Trim((*mapVal).(string), "\t\n\r ")
+		if len(str) > 0 {
+			i64, err := strconv.ParseInt(str, 10, 64)
+			if err == nil {
+				m.structVofElem.Field(i).SetInt(i64)
+			} else {
+				log.Printf("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "int族", err.Error())
+			}
 		} else {
-			log.Printf("%q转换成%v失败：%s", mapVal, "int族", err.Error())
+			log.Printf("字段%q为空,忽略转换成%v,", *mapKey, "int族")
 		}
 	default:
 	}
 }
 
-func (m *MapToStruct) transformUint(i int, mapVal interface{}, mapValueType reflect.Kind) {
+func (m *MapToStruct) transformUint(i int, mapVal *interface{}, mapKey *string, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
-		m.structVofElem.Field(i).SetUint(uint64(mapVal.(float64)))
+		m.structVofElem.Field(i).SetUint(uint64((*mapVal).(float64)))
 	case reflect.String:
-		ui64, err := strconv.ParseUint(mapVal.(string), 10, 64)
-		if err == nil {
-			m.structVofElem.Field(i).SetUint(ui64)
+		str := strings.Trim((*mapVal).(string), "\t\n\r ")
+		if len(str) > 0 {
+			i64, err := strconv.ParseUint(str, 10, 64)
+			if err == nil {
+				m.structVofElem.Field(i).SetUint(i64)
+			} else {
+				log.Printf("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "uint族", err.Error())
+			}
 		} else {
-			log.Printf("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
+			log.Printf("字段%q为空,忽略转换成%v,", *mapKey, "uint族")
 		}
 	default:
 	}
 }
 
-func (m *MapToStruct) transformFloat(i int, mapVal interface{}, mapValueType reflect.Kind) {
+func (m *MapToStruct) transformFloat(i int, mapVal *interface{}, mapKey *string, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
-		m.structVofElem.Field(i).SetFloat(mapVal.(float64))
+		m.structVofElem.Field(i).SetFloat((*mapVal).(float64))
 	case reflect.String:
-		f64, err := strconv.ParseFloat(mapVal.(string), 64)
-		if err == nil {
-			m.structVofElem.Field(i).SetFloat(f64)
+		str := strings.Trim((*mapVal).(string), "\t\n\r ")
+		if len(str) > 0 {
+			f64, err := strconv.ParseFloat(str, 64)
+			if err == nil {
+				m.structVofElem.Field(i).SetFloat(f64)
+			} else {
+				log.Printf("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "float族", err.Error())
+			}
 		} else {
-			log.Printf("%q转换成%v失败：%s", mapVal, "float族", err.Error())
+			log.Printf("字段%q为空,忽略转换成%v,", *mapKey, "float族")
 		}
 	default:
 	}
 }
 
-func (m *MapToStruct) transformBool(i int, mapVal interface{}, mapValueType reflect.Kind) {
+func (m *MapToStruct) transformBool(i int, mapVal *interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.String:
-		mapValStr := strings.ToLower(mapVal.(string))
+		mapValStr := strings.ToLower((*mapVal).(string))
 		if mapValStr == "true" || mapValStr == "1" {
 			m.structVofElem.Field(i).SetBool(true)
 		} else if mapValStr == "false" || mapValStr == "0" {
 			m.structVofElem.Field(i).SetBool(false)
 		}
 	case reflect.Float64:
-		mapValInt := int8(mapVal.(float64))
+		mapValInt := int8((*mapVal).(float64))
 		if mapValInt == 1 {
 			m.structVofElem.Field(i).SetBool(true)
 		} else if mapValInt == 0 {
@@ -260,11 +275,10 @@ func (m *MapToStruct) transformBool(i int, mapVal interface{}, mapValueType refl
 	}
 }
 
-func (m *MapToStruct) transformString(i int, mapVal interface{}, mapValueType reflect.Kind) {
+func (m *MapToStruct) transformString(i int, mapVal *interface{}, mapValueType reflect.Kind) {
 	switch mapValueType {
 	case reflect.Float64:
-		//mapValStr := strconv.FormatFloat(mapVal.(float64),'g',10,64)
-		mapValStr := fmt.Sprintf("%.f", mapVal.(float64))
+		mapValStr := fmt.Sprintf("%.f", (*mapVal).(float64))
 		m.structVofElem.Field(i).SetString(mapValStr)
 	default:
 	}
