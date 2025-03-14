@@ -43,7 +43,7 @@ func TestDemo2(t *testing.T) {
 	if err == nil {
 		t.Log("json转struct成功，stu2 =", stu2)
 	} else {
-		t.Fatal("json转struct失败，err =", err)
+		t.Fatal("使用 json.Unmarshal 转换失败，json转struct失败，err =", err)
 	}
 }
 
@@ -59,5 +59,9 @@ func TestDemo3(t *testing.T) {
 	m.Debug = false
 	m.Tagkey = "stm"
 	m.Transform(&stu2, tmp)
-	t.Log("json转struct成功，stu2 =", stu2)
+	if !m.Success {
+		t.Fatal("json转struct失败")
+	} else {
+		t.Log("json转struct成功，stu2 =", stu2)
+	}
 }

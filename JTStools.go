@@ -68,18 +68,31 @@ func (m *MapToStruct) getMapValue(i int) (mapVal interface{}, ok bool, tagName s
 
 // Transform 把map映射到结构体
 func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface{}) {
-	if destStructData == nil {
-		m.errmsg = "param destStructData is nil"
-		if m.Debug {
+	defer func() {
+		//捕获异常
+		if err := recover(); err != nil {
+			m.Success = false
+			if len(m.errmsg) == 0 {
+				m.errmsg = err.(string)
+			} else {
+				m.errmsg = fmt.Sprintf("%s,捕获异常:%s", m.errmsg, err.(string))
+			}
+		}
+		//如果是调试模式，输出错误
+		if m.Debug && (len(m.errmsg) > 0) {
 			log.Println(m.errmsg)
 		}
+	}()
+
+	//重置状态
+	m.Success = false
+	m.errmsg = ""
+	if destStructData == nil {
+		m.errmsg = "param destStructData is nil"
 		return
 	}
 	if sourceData == nil {
 		m.errmsg = "param sourceData is nil"
-		if m.Debug {
-			log.Println(m.errmsg)
-		}
 		return
 	}
 
@@ -91,18 +104,12 @@ func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface
 		err := json.Unmarshal([]byte(str), &m.sourceMapData)
 		if err != nil {
 			m.errmsg = err.Error()
-			if m.Debug {
-				log.Println(m.errmsg)
-			}
 			return
 		}
 	} else {
 		m.sourceMapData, ok = sourceData.(map[string]interface{})
 		if !ok {
 			m.errmsg = "sourceData type is not map[string]interface{}"
-			if m.Debug {
-				log.Println(m.errmsg)
-			}
 			return
 		}
 	}
@@ -118,6 +125,11 @@ func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface
 	//}
 
 	m.structTypeOf = reflect.TypeOf(destStructData)
+	//数据接收参数必须是指针类型
+	if m.structTypeOf.Kind() != reflect.Ptr {
+		m.errmsg = "param destStructData is not ptr"
+		return
+	}
 	m.structTofElem = m.structTypeOf.Elem()
 	m.structValueOf = reflect.ValueOf(destStructData)
 	m.structVofElem = m.structValueOf.Elem()
@@ -131,10 +143,10 @@ func (m *MapToStruct) Transform(destStructData interface{}, sourceData interface
 		}
 
 		//获取map对应的value
-		mapVal, ok, tagName := m.getMapValue(i)
-		if !ok {
+		mapVal, ok2, tagName := m.getMapValue(i)
+		if !ok2 {
 			if m.Debug {
-				log.Printf("结构体第%d个字段(%s)，获取对应map的值失败", i, m.structTofElem.Field(i).Name)
+				log.Println("结构体第%d个字段(%s)，获取对应map的值失败", i, m.structTofElem.Field(i).Name)
 			}
 			continue
 		}
@@ -206,10 +218,10 @@ func (m *MapToStruct) transformInt(i int, mapVal *interface{}, mapKey *string, m
 			if err == nil {
 				m.structVofElem.Field(i).SetInt(i64)
 			} else {
-				log.Printf("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "int族", err.Error())
+				log.Println("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "int族", err.Error())
 			}
 		} else {
-			log.Printf("字段%q为空,忽略转换成%v,", *mapKey, "int族")
+			log.Println("字段%q为空,忽略转换成%v,", *mapKey, "int族")
 		}
 	default:
 	}
@@ -226,10 +238,10 @@ func (m *MapToStruct) transformUint(i int, mapVal *interface{}, mapKey *string, 
 			if err == nil {
 				m.structVofElem.Field(i).SetUint(i64)
 			} else {
-				log.Printf("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "uint族", err.Error())
+				log.Println("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "uint族", err.Error())
 			}
 		} else {
-			log.Printf("字段%q为空,忽略转换成%v,", *mapKey, "uint族")
+			log.Println("字段%q为空,忽略转换成%v,", *mapKey, "uint族")
 		}
 	default:
 	}
@@ -246,10 +258,10 @@ func (m *MapToStruct) transformFloat(i int, mapVal *interface{}, mapKey *string,
 			if err == nil {
 				m.structVofElem.Field(i).SetFloat(f64)
 			} else {
-				log.Printf("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "float族", err.Error())
+				log.Println("字段%q%q转换成%v失败：%s,忽略转换", *mapKey, *mapVal, "float族", err.Error())
 			}
 		} else {
-			log.Printf("字段%q为空,忽略转换成%v,", *mapKey, "float族")
+			log.Println("字段%q为空,忽略转换成%v,", *mapKey, "float族")
 		}
 	default:
 	}
@@ -371,7 +383,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(int(i64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "int族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "int族", err.Error())
 				}
 			default:
 			}
@@ -390,7 +402,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(int8(i64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "int族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "int族", err.Error())
 				}
 			default:
 			}
@@ -409,7 +421,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(int16(i64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "int族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "int族", err.Error())
 				}
 			default:
 			}
@@ -428,7 +440,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(int32(i64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "int族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "int族", err.Error())
 				}
 			default:
 			}
@@ -447,7 +459,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(i64))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "int族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "int族", err.Error())
 				}
 			default:
 			}
@@ -466,7 +478,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(uint(ui64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
 				}
 			default:
 			}
@@ -485,7 +497,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(uint8(ui64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
 				}
 			default:
 			}
@@ -504,7 +516,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(uint16(ui64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
 				}
 			default:
 			}
@@ -523,7 +535,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(uint32(ui64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
 				}
 			default:
 			}
@@ -542,7 +554,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(uint64(ui64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "uint族", err.Error())
 				}
 			default:
 			}
@@ -561,7 +573,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(float32(f64)))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "float族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "float族", err.Error())
 				}
 			default:
 			}
@@ -580,7 +592,7 @@ func (m *MapToStruct) transformPtr(i int, mapVal interface{}, mapValueType refle
 					n.Elem().Set(reflect.ValueOf(f64))
 					m.structVofElem.Field(i).Set(n)
 				} else {
-					log.Printf("%q转换成%v失败：%s", mapVal, "float族", err.Error())
+					log.Println("%q转换成%v失败：%s", mapVal, "float族", err.Error())
 				}
 			default:
 			}
